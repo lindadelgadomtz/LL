@@ -36,6 +36,58 @@ const data = [
         contact: { phone: "+34 91 000 22 33", website: "#" },
         logoEmoji: "🚛",
     },
+    {
+        name: "Benelux Cold Chain",
+        verified: true,
+        rating: 4.5,
+        types: ["reefer", "truck"],
+        lanes: [
+            { origin: "NL", destination: "BE" },
+            { origin: "NL", destination: "DE" },
+        ],
+        description: "Temperature-controlled freight across Benelux and Germany.",
+        contact: { email: "ops@beneluxcold.example", website: "#" },
+        logoEmoji: "❄️",
+    },
+    {
+        name: "Rhine Container Transit",
+        verified: true,
+        rating: 4.4,
+        types: ["container"],
+        lanes: [
+            { origin: "DE", destination: "NL" },
+            { origin: "DE", destination: "GB" },
+        ],
+        description: "Container drayage and linehaul on core Rhine corridors.",
+        contact: { phone: "+49 30 1234 5678", website: "#" },
+        logoEmoji: "📦",
+    },
+    {
+        name: "Mediterraneo Tanker Logistics",
+        verified: true,
+        rating: 4.6,
+        types: ["tanker", "truck"],
+        lanes: [
+            { origin: "IT", destination: "ES" },
+            { origin: "IT", destination: "FR" },
+        ],
+        description: "Bulk liquid transport with ADR-certified fleet.",
+        contact: { email: "dispatch@medtanker.example", website: "#" },
+        logoEmoji: "🛢️",
+    },
+    {
+        name: "Vistula Flatbed & Steel",
+        verified: true,
+        rating: 4.3,
+        types: ["flatbed", "truck"],
+        lanes: [
+            { origin: "PL", destination: "DE" },
+            { origin: "PL", destination: "NL" },
+        ],
+        description: "Flatbed specialist for steel and oversized loads.",
+        contact: { phone: "+48 22 555 66 77", website: "#" },
+        logoEmoji: "🏗️",
+    }
 ];
 
 async function run() {

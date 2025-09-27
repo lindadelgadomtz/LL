@@ -205,9 +205,17 @@ Return at most 5 items. Keep descriptions ≤ 120 chars. No newlines in fields.`
             max_tokens: 450,
         });
 
-        const toolCall = completion.choices?.[0]?.message?.tool_calls?.[0];
-        const argText = toolCall?.function?.arguments;
-        if (!argText) throw new Error("no_tool_call_arguments");
+        const toolCalls = completion.choices?.[0]?.message?.tool_calls ?? [];
+        const fnCall = toolCalls.find(tc => tc.type === "function");
+
+        if (!fnCall || fnCall.type !== "function") {
+            throw new Error("no_function_tool_call");
+        }
+
+        const argText = fnCall.function.arguments;
+        if (!argText) {
+            throw new Error("no_tool_call_arguments");
+        }
 
         let parsed: any;
         try {
