@@ -1,13 +1,3 @@
 {
-    "functions": {
-        "app/api/**": {
-            "runtime": "nodejs20.x",
-            "memory": 1024,
-            "maxDuration": 10,
-            "regions": [
-                "fra1",
-                "cdg1"
-            ]
-        }
-    }
+    "version": 2
 }
