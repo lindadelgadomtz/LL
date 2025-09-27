@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import mongoose from "mongoose";
 import Ajv from "ajv";
+import { dbConnect } from "@/src/lib/db";
+
+
+
 
 function sanitizeJsonString(s: string) {
     if (!s) return s;
@@ -44,11 +48,6 @@ const CarrierSchema = new mongoose.Schema(
 CarrierSchema.index({ "lanes.origin": 1, "lanes.destination": 1, types: 1 });
 const Carrier = mongoose.models.Carrier || mongoose.model("Carrier", CarrierSchema);
 
-async function connect() {
-    if (!MONGODB_URI) throw new Error("Missing MONGODB_URI");
-    if (mongoose.connection.readyState >= 1) return;
-    await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 });
-}
 
 // ---- AI: strict schema + validator
 const carriersSchema = {
@@ -396,7 +395,7 @@ export async function POST(req: Request) {
     const rateKey = `${ip}`;
 
     try {
-        await connect();
+        await dbConnect();
     } catch (e) {
         console.error("Mongo connect error:", e);
         const suggestions = await aiFallback({ type, origin, destination }, rateKey);
