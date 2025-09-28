@@ -1,18 +1,18 @@
 // app/api/search/route.ts
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import mongoose from "mongoose";
-import Ajv from "ajv";
+import mongoose, { Types } from "mongoose";
+import Ajv, { JSONSchemaType } from "ajv";
 import { dbConnect } from "@/src/lib/db";
 
-
-
-
+/** Small helper; we now actually use it to avoid the unused warning */
 function sanitizeJsonString(s: string) {
     if (!s) return s;
-    // remove markdown fences if present
-    s = s.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
-    // try to cut at the last complete bracket/brace to avoid trailing partials
+    s = s.trim()
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/```$/i, "")
+        .trim();
     const lastBrace = s.lastIndexOf("}");
     const lastBracket = s.lastIndexOf("]");
     const cut = Math.max(lastBrace, lastBracket);
@@ -22,19 +22,71 @@ function sanitizeJsonString(s: string) {
 
 export const runtime = "nodejs";
 
-// ---- ENV
+/* -------------------- ENV -------------------- */
 const {
-    MONGODB_URI,
     OPENAI_API_KEY,
     OPENAI_MODEL = "gpt-4.1-mini",
     AI_FALLBACK_ENABLED = "true",
 } = process.env;
 
-// ---- MONGOOSE MODEL
-const LaneSchema = new mongoose.Schema({ origin: String, destination: String }, { _id: false });
-const CarrierSchema = new mongoose.Schema(
+/* -------------------- Domain types -------------------- */
+type TransportType = "truck" | "reefer" | "container" | "flatbed" | "tanker";
+
+interface Lane {
+    origin: string;
+    destination: string;
+}
+interface Contact {
+    email?: string;
+    phone?: string;
+    website?: string;
+}
+
+/** What we accept back from the AI (strict) */
+interface AICarrier {
+    id: string;
+    name: string;
+    types: TransportType[];
+    lanes: Lane[];
+    description?: string;
+    logoEmoji?: string;
+}
+interface AICarriersResponse {
+    items: AICarrier[];
+}
+
+/** What we send to the UI (DB or AI) */
+interface CarrierOut extends AICarrier {
+    verified: boolean;
+    rating?: number;
+    contact?: Contact;
+    source: "db" | "ai";
+    confidence?: number; // only for AI
+}
+
+/* -------------------- Mongoose models -------------------- */
+const LaneSchema = new mongoose.Schema<Lane>(
+    { origin: String, destination: String },
+    { _id: false }
+);
+
+interface CarrierDoc {
+    _id: Types.ObjectId;
+    name: string;
+    verified: boolean;
+    rating?: number;
+    types: TransportType[];
+    lanes: Lane[];
+    description?: string;
+    contact?: Contact;
+    logoEmoji?: string;
+    createdAt?: Date;
+    updatedAt?: Date;
+}
+
+const CarrierSchema = new mongoose.Schema<CarrierDoc>(
     {
-        name: String,
+        name: { type: String, required: true },
         verified: { type: Boolean, default: false },
         rating: Number,
         types: [String],
@@ -45,87 +97,84 @@ const CarrierSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
 CarrierSchema.index({ "lanes.origin": 1, "lanes.destination": 1, types: 1 });
-const Carrier = mongoose.models.Carrier || mongoose.model("Carrier", CarrierSchema);
 
+type CarrierModel = mongoose.Model<CarrierDoc>;
+const Carrier =
+    (mongoose.models.Carrier as CarrierModel) ||
+    mongoose.model<CarrierDoc>("Carrier", CarrierSchema);
 
-// ---- AI: strict schema + validator
-const carriersSchema = {
-    name: "CarriersResponse",
-    schema: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
+/* -------------------- AJV schema & validator -------------------- */
+const carriersJsonSchema: JSONSchemaType<AICarriersResponse> = {
+    type: "object",
+    additionalProperties: false,
+    required: ["items"],
+    properties: {
+        items: {
+            type: "array",
             items: {
-                type: "array",
-                items: {
-                    type: "object",
-                    additionalProperties: false,
-                    required: ["id", "name", "types", "lanes"],
-                    properties: {
-                        id: { type: "string" },
-                        name: { type: "string" },
-                        types: {
-                            type: "array",
-                            items: {
-                                type: "string",
-                                enum: ["truck", "reefer", "container", "flatbed", "tanker"],
-                            },
+                type: "object",
+                additionalProperties: false,
+                required: ["id", "name", "types", "lanes"],
+                properties: {
+                    id: { type: "string" },
+                    name: { type: "string" },
+                    types: {
+                        type: "array",
+                        items: {
+                            type: "string",
+                            enum: ["truck", "reefer", "container", "flatbed", "tanker"],
                         },
-                        lanes: {
-                            type: "array",
-                            items: {
-                                type: "object",
-                                additionalProperties: false,
-                                required: ["origin", "destination"],
-                                properties: {
-                                    origin: { type: "string" }, // ISO-3166 alpha-2 preferred
-                                    destination: { type: "string" },
-                                },
-                            },
-                        },
-                        description: { type: "string" },
-                        logoEmoji: { type: "string" },
                     },
+                    lanes: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            additionalProperties: false,
+                            required: ["origin", "destination"],
+                            properties: {
+                                origin: { type: "string" },
+                                destination: { type: "string" },
+                            },
+                        },
+                    },
+                    description: { type: "string", nullable: true },
+                    logoEmoji: { type: "string", nullable: true },
                 },
             },
         },
-        required: ["items"],
     },
-    strict: true,
-} as const;
+};
 
 const ajv = new Ajv({ removeAdditional: "all", allErrors: true });
-const validateCarriers = ajv.compile(carriersSchema.schema as any);
+const validateCarriers = ajv.compile<AICarriersResponse>(carriersJsonSchema);
 
-// ---- Stub suggestion (local, no API)
-function stubSuggestion({
-    type,
-    origin,
-    destination,
-}: {
+/* -------------------- Stub suggestion -------------------- */
+function stubSuggestion(params: {
     type?: string;
     origin?: string;
     destination?: string;
-}) {
+}): CarrierOut[] {
+    const { type, origin, destination } = params;
     return [
         {
             id: `ai-stub-${Date.now()}`,
             name: "Regional Carrier Suggestion",
             verified: false,
-            types: type ? [type] : ["truck"],
+            types: (type ? [type] : ["truck"]) as TransportType[],
             lanes: [{ origin: origin || "FR", destination: destination || "ES" }],
             description: "Unverified suggestion based on similar lanes in the region.",
             logoEmoji: "🧭",
-            source: "ai" as const,
+            source: "ai",
             confidence: 0.55,
         },
     ];
 }
 
-// ---- Simple in-memory rate limit for AI calls
-const aiWindowMs = 60_000; // per minute
-const aiMaxCalls = 20;     // per IP per minute
+/* -------------------- Simple in-memory rate limit for AI calls -------------------- */
+const aiWindowMs = 60_000;
+const aiMaxCalls = 20;
 const aiBucket: Map<string, { count: number; since: number }> = new Map();
 
 function allowAiCall(key: string) {
@@ -140,22 +189,22 @@ function allowAiCall(key: string) {
     return b.count <= aiMaxCalls;
 }
 
-// ---- AI Fallback with guardrails
+/* -------------------- AI Fallback with guardrails -------------------- */
 const MIN_FILTERS_FOR_AI = 2;
 
 async function aiFallback(
     params: { type?: string; origin?: string; destination?: string },
     rateKey: string
-) {
+): Promise<CarrierOut[]> {
     const { type, origin, destination } = params;
 
-    const stub = (reason: string) => {
+    const stub = (reason: string): CarrierOut[] => {
         console.warn("AI: returning stub —", reason, { type, origin, destination });
         return stubSuggestion(params);
     };
 
-    // Toggle
-    if ((process.env.AI_FALLBACK_ENABLED || "true") !== "true") return stub("ai_disabled");
+    // Toggle via env var we destructured above
+    if (AI_FALLBACK_ENABLED !== "true") return stub("ai_disabled");
 
     // Require ≥ 2 filters
     const filled = [type, origin, destination].filter(Boolean).length;
@@ -180,10 +229,10 @@ async function aiFallback(
 - destination: ${destination || "ANY"}
 Return at most 5 items. Keep descriptions ≤ 120 chars. No newlines in fields.`;
 
-    // ---------- 1) PREFERRED: function calling (tools) ----------
+    /* ---------- 1) Function calling (tools) ---------- */
     try {
         const completion = await openai.chat.completions.create({
-            model: OPENAI_MODEL || "gpt-4o-mini",
+            model: OPENAI_MODEL,
             messages: [
                 { role: "system", content: system },
                 { role: "user", content: user + " Use the function 'return_carriers'." },
@@ -194,8 +243,7 @@ Return at most 5 items. Keep descriptions ≤ 120 chars. No newlines in fields.`
                     function: {
                         name: "return_carriers",
                         description: "Return carrier suggestions as structured JSON.",
-                        // Use the same JSON Schema you defined (carriersSchema.schema)
-                        parameters: carriersSchema.schema as any,
+                        parameters: carriersJsonSchema as unknown as Record<string, unknown>,
                     },
                 },
             ],
@@ -204,40 +252,37 @@ Return at most 5 items. Keep descriptions ≤ 120 chars. No newlines in fields.`
             max_tokens: 450,
         });
 
-        const toolCalls = completion.choices?.[0]?.message?.tool_calls ?? [];
-        const fnCall = toolCalls.find(tc => tc.type === "function");
-
-        if (!fnCall || fnCall.type !== "function") {
-            throw new Error("no_function_tool_call");
+        // Narrow tool_calls without using 'any'
+        interface FunctionToolCall {
+            type: "function";
+            id?: string;
+            function: { name: string; arguments: string };
         }
+        const toolCalls =
+            (completion.choices?.[0]?.message?.tool_calls as unknown as
+                | FunctionToolCall[]
+                | undefined) ?? [];
+
+        const fnCall = toolCalls.find((tc) => tc.type === "function");
+        if (!fnCall) throw new Error("no_function_tool_call");
 
         const argText = fnCall.function.arguments;
-        if (!argText) {
-            throw new Error("no_tool_call_arguments");
-        }
+        if (!argText) throw new Error("no_tool_call_arguments");
 
-        let parsed: any;
-        try {
-            parsed = JSON.parse(argText);
-        } catch {
-            console.error("AI: tool args parse error, raw:", argText);
-            throw new Error("tool_args_parse_error");
-        }
+        const parsed = JSON.parse(argText) as unknown;
 
-        const ok = validateCarriers(parsed); // Ajv strips extras
-        if (!ok) {
+        if (!validateCarriers(parsed)) {
             console.error("AI: Ajv errors (tools):", validateCarriers.errors);
             throw new Error("ajv_validation_failed_tools");
         }
+        const items = (parsed as AICarriersResponse).items;
 
-        const items: any[] = Array.isArray(parsed.items) ? parsed.items : [];
-        const mapped =
-            items.slice(0, 5).map((x: any) => ({
-                ...x,
-                verified: false,
-                source: "ai" as const,
-                confidence: 0.55,
-            })) ?? [];
+        const mapped: CarrierOut[] = items.slice(0, 5).map((x) => ({
+            ...x,
+            verified: false,
+            source: "ai",
+            confidence: 0.55,
+        }));
 
         if (mapped.length > 0) {
             console.log("AI: tools suggestions:", mapped.length);
@@ -248,10 +293,10 @@ Return at most 5 items. Keep descriptions ≤ 120 chars. No newlines in fields.`
         console.error("AI: tools call failed, degrading:", err);
     }
 
-    // ---------- 2) STRICT: json_schema ----------
+    /* ---------- 2) Strict json_schema ---------- */
     try {
         const completion = await openai.chat.completions.create({
-            model: OPENAI_MODEL || "gpt-4o-mini",
+            model: OPENAI_MODEL,
             messages: [
                 { role: "system", content: system },
                 {
@@ -273,38 +318,27 @@ Return at most 5 items. Keep descriptions ≤ 120 chars. No newlines in fields.`
 }`,
                 },
             ],
-            response_format: { type: "json_schema", json_schema: carriersSchema },
+            response_format: { type: "json_schema", json_schema: { name: "CarriersResponse", schema: carriersJsonSchema, strict: true } },
             max_tokens: 350,
             temperature: 0.2,
         });
 
         const raw = completion.choices[0]?.message?.content ?? '{"items":[]}';
-        // If you kept the helper, sanitize before parsing:
-        // const text = sanitizeJsonString(raw);
-        const text = raw;
+        const text = sanitizeJsonString(raw);
+        const parsed = JSON.parse(text) as unknown;
 
-        let parsed: any;
-        try {
-            parsed = JSON.parse(text);
-        } catch {
-            console.error("AI: json_schema parse error, raw:", raw);
-            throw new Error("json_schema_parse_error");
-        }
-
-        const ok = validateCarriers(parsed);
-        if (!ok) {
+        if (!validateCarriers(parsed)) {
             console.error("AI: Ajv errors (json_schema):", validateCarriers.errors);
             throw new Error("ajv_validation_failed_schema");
         }
+        const items = (parsed as AICarriersResponse).items;
 
-        const items: any[] = Array.isArray(parsed.items) ? parsed.items : [];
-        const mapped =
-            items.slice(0, 5).map((x: any) => ({
-                ...x,
-                verified: false,
-                source: "ai" as const,
-                confidence: 0.55,
-            })) ?? [];
+        const mapped: CarrierOut[] = items.slice(0, 5).map((x) => ({
+            ...x,
+            verified: false,
+            source: "ai",
+            confidence: 0.55,
+        }));
 
         if (mapped.length > 0) {
             console.log("AI: json_schema suggestions:", mapped.length);
@@ -315,10 +349,10 @@ Return at most 5 items. Keep descriptions ≤ 120 chars. No newlines in fields.`
         console.error("AI: json_schema call failed, degrading:", err);
     }
 
-    // ---------- 3) SIMPLE: json_object (with sanitation) ----------
+    /* ---------- 3) json_object (with sanitation) ---------- */
     try {
         const completion2 = await openai.chat.completions.create({
-            model: OPENAI_MODEL || "gpt-4o-mini",
+            model: OPENAI_MODEL,
             messages: [
                 { role: "system", content: system },
                 {
@@ -346,27 +380,21 @@ Return at most 5 items. Keep descriptions ≤ 120 chars. No newlines in fields.`
         });
 
         const raw2 = completion2.choices[0]?.message?.content ?? '{"items":[]}';
-        // Optional sanitize if you kept helper:
-        // const text2 = sanitizeJsonString(raw2);
-        const text2 = raw2;
+        const text2 = sanitizeJsonString(raw2);
+        const parsed2 = JSON.parse(text2) as unknown;
 
-        let parsed2: any;
-        try {
-            parsed2 = JSON.parse(text2);
-        } catch {
-            console.error("AI: json_object parse error, raw:", raw2);
-            return stub("json_object_parse_error");
+        if (!validateCarriers(parsed2)) {
+            console.error("AI: Ajv errors (json_object):", validateCarriers.errors);
+            return stub("json_object_validation_failed");
         }
+        const items2 = (parsed2 as AICarriersResponse).items;
 
-        const ok2 = validateCarriers(parsed2);
-        const items2: any[] = ok2 && Array.isArray(parsed2.items) ? parsed2.items : [];
-        const mapped2 =
-            items2.slice(0, 5).map((x: any) => ({
-                ...x,
-                verified: false,
-                source: "ai" as const,
-                confidence: 0.55,
-            })) ?? [];
+        const mapped2: CarrierOut[] = items2.slice(0, 5).map((x) => ({
+            ...x,
+            verified: false,
+            source: "ai",
+            confidence: 0.55,
+        }));
 
         if (mapped2.length > 0) {
             console.log("AI: json_object suggestions:", mapped2.length);
@@ -379,10 +407,14 @@ Return at most 5 items. Keep descriptions ≤ 120 chars. No newlines in fields.`
     }
 }
 
+/* -------------------- Handler -------------------- */
+type CarrierQuery = Partial<{
+    types: TransportType;
+    "lanes.origin": string;
+    "lanes.destination": string;
+    verified: true;
+}>;
 
-
-
-// ---- Handler
 export async function POST(req: Request) {
     const t0 = Date.now();
     const { type, origin, destination, verifiedOnly } = await req.json();
@@ -394,6 +426,7 @@ export async function POST(req: Request) {
         "local";
     const rateKey = `${ip}`;
 
+    // connect DB (cached)
     try {
         await dbConnect();
     } catch (e) {
@@ -412,22 +445,32 @@ export async function POST(req: Request) {
     }
 
     // Build DB query from provided filters only
-    const q: any = {};
-    if (type) q.types = type;
+    const q: CarrierQuery = {};
+    if (type) q.types = type as TransportType;
     if (origin) q["lanes.origin"] = origin;
     if (destination) q["lanes.destination"] = destination;
     if (verifiedOnly) q.verified = true;
 
     try {
-        const carriers = await Carrier.find(q).limit(50).lean();
+        const carriers = await Carrier.find(q).limit(50).lean<CarrierDoc[]>();
         const t1 = Date.now();
 
         if (carriers.length > 0) {
+            const out: CarrierOut[] = carriers.map((c) => ({
+                id: c._id.toString(),
+                name: c.name,
+                types: c.types,
+                lanes: c.lanes,
+                description: c.description,
+                logoEmoji: c.logoEmoji,
+                verified: c.verified,
+                rating: c.rating,
+                contact: c.contact,
+                source: "db",
+            }));
+
             return NextResponse.json(
-                {
-                    carriers: carriers.map((c: any) => ({ ...c, source: "db" as const })),
-                    usedAi: false,
-                },
+                { carriers: out, usedAi: false },
                 { headers: { "x-duration-ms": String(t1 - t0) } }
             );
         }
@@ -453,7 +496,8 @@ export async function POST(req: Request) {
                 carriers: [],
                 suggestions,
                 usedAi: true,
-                notice: "We hit an error querying the database. Showing unverified AI suggestions.",
+                notice:
+                    "We hit an error querying the database. Showing unverified AI suggestions.",
             },
             { headers: { "x-duration-ms": String(t1 - t0) } }
         );

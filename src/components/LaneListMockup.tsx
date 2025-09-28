@@ -139,7 +139,7 @@ export default function LaneListMockup() {
                     usedAi: usedAiResponse,
                     notice: info,
                 });
-            } catch (_e) {
+            } catch {
                 if (!aborted) setError("Could not load results. Please try again.");
             } finally {
                 if (!aborted) setLoading(false);
@@ -159,7 +159,7 @@ export default function LaneListMockup() {
     const findCountryName = (code: string): string =>
         countries.find((c) => c.code === code)?.name || "";
 
-    const findTypeLabel = (id: string): string =>
+    const findTypeLabel = (id: TransportType): string =>
         transportTypes.find((t) => t.id === id)?.label || "";
 
     // --- Reusable bits -------------------------------------------------------
@@ -405,7 +405,7 @@ export default function LaneListMockup() {
 
                                 <div className="mt-4 flex flex-wrap gap-2">
                                     {c.types?.map((t: TransportType) => (
-                                        <Badge key={t}>{t}</Badge>
+                                        <Badge key={t}>{findTypeLabel(t) || t}</Badge>
                                     ))}
                                 </div>
 

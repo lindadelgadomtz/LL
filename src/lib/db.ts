@@ -1,26 +1,24 @@
-// lib/db.ts
-import mongoose from "mongoose";
+// src/lib/db.ts
+import mongoose, { type Mongoose } from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI!;
-if (!MONGODB_URI) throw new Error("Missing MONGODB_URI");
+type Cached = { conn: Mongoose | null; promise: Promise<Mongoose> | null };
 
-type Cached = {
-    conn: typeof mongoose | null;
-    promise: Promise<typeof mongoose> | null;
-};
-
-let cached = (global as any)._mongoose as Cached | undefined;
-if (!cached) {
-    cached = (global as any)._mongoose = { conn: null, promise: null };
+declare global {
+    var _mongoose: Cached | undefined;
 }
 
-export async function dbConnect() {
-    if (cached!.conn) return cached!.conn;
-    if (!cached!.promise) {
-        cached!.promise = mongoose
-            .connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
-            .then((m) => m);
+const cached = (globalThis._mongoose ??= { conn: null, promise: null });
+
+export async function dbConnect(): Promise<Mongoose> {
+    if (cached.conn) return cached.conn;
+
+    const uri = process.env.MONGODB_URI;
+    if (!uri) throw new Error("Missing MONGODB_URI");
+
+    if (!cached.promise) {
+        cached.promise = mongoose.connect(uri, { serverSelectionTimeoutMS: 5000 });
     }
-    cached!.conn = await cached!.promise;
-    return cached!.conn;
+
+    cached.conn = await cached.promise;
+    return cached.conn;
 }
