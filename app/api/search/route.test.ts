@@ -1,48 +1,84 @@
 /** @jest-environment node */
 
-import type { NextResponse } from "next/server";
-
-// 1) Mock dbConnect so no real Mongo connection happens
 jest.mock("@/src/lib/db", () => ({
     dbConnect: jest.fn().mockResolvedValue(undefined),
 }));
 
-// 2) Mock mongoose with functions *created inside* the factory (no TDZ)
 jest.mock("mongoose", () => {
     const actual = jest.requireActual("mongoose");
 
+    // keep these untyped here; we'll cast them after import
     const mockLean = jest.fn();
     const mockLimit = jest.fn().mockReturnValue({ lean: mockLean });
     const mockFind = jest.fn().mockReturnValue({ limit: mockLimit, lean: mockLean });
 
     return {
         ...actual,
-        // ensure no cached model collides with tests
         models: {},
-        // when your route calls mongoose.model(...), return an object with .find
         model: jest.fn(() => ({ find: mockFind })),
         Schema: actual.Schema,
-
-        // expose the fns so tests can control return values
         __mock: { mockFind, mockLimit, mockLean },
     };
 });
 
-// 3) After mocks are set up, import the mocked module & the route
 import * as mongoose from "mongoose";
-const { mockFind, mockLimit, mockLean } = (mongoose as any).__mock;
-
 import { POST } from "./route";
+
+/* ---------- Strong typings for the mock chain ---------- */
+type Lane = { origin: string; destination: string };
+
+type CarrierRow = {
+    _id: string;
+    id?: string;
+    name: string;
+    verified: boolean;
+    types: string[];
+    lanes: Lane[];
+    description?: string;
+    logoEmoji?: string;
+};
+
+type LeanFn = jest.Mock<Promise<CarrierRow[]>, []>;
+type LimitChain = { lean: LeanFn };
+type LimitFn = jest.Mock<LimitChain, [number?]>;
+type FindChain = { limit: LimitFn; lean: LeanFn };
+type FindFn = jest.Mock<FindChain, [unknown?]>;
+
+type MongooseWithMock = typeof import("mongoose") & {
+    __mock: { mockFind: FindFn; mockLimit: LimitFn; mockLean: LeanFn };
+};
+
+const { __mock } = mongoose as unknown as MongooseWithMock;
+const { mockFind, mockLimit, mockLean } = __mock;
+
+/* ---------- Response typing used by assertions ---------- */
+type CarrierOut = {
+    id: string;
+    name: string;
+    types: string[];
+    lanes: Lane[];
+    description?: string;
+    logoEmoji?: string;
+    verified: boolean;
+    rating?: number;
+    contact?: { email?: string; phone?: string; website?: string };
+    source: "db" | "ai";
+    confidence?: number;
+};
+
+type SearchJson =
+    | { carriers: CarrierOut[]; usedAi: false }
+    | { carriers: []; suggestions: CarrierOut[]; usedAi: true; notice?: string };
 
 describe("POST /api/search", () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        // default: DB returns empty array
-        mockFind.mockReturnValue({ limit: mockLimit, lean: mockLean });
-        mockLean.mockResolvedValue([]);
 
-        // keep AI from making network calls in unit tests
-        process.env.AI_FALLBACK_ENABLED = "false"; // force stub path if DB empty
+        // type-safe default chain
+        mockFind.mockReturnValue({ limit: mockLimit, lean: mockLean } as unknown as FindChain);
+        mockLean.mockResolvedValue([] as CarrierRow[]); // <-- fixes “never[]” error
+
+        process.env.AI_FALLBACK_ENABLED = "false";
         delete process.env.OPENAI_API_KEY;
     });
 
@@ -58,7 +94,7 @@ describe("POST /api/search", () => {
                 description: "test",
                 logoEmoji: "⛰️",
             },
-        ]);
+        ] as CarrierRow[]); // <-- fixes the second error
 
         const req = new Request("http://test.local/api/search", {
             method: "POST",
@@ -66,27 +102,34 @@ describe("POST /api/search", () => {
             body: JSON.stringify({ type: "truck" }),
         });
 
-        const res = (await POST(req as any)) as NextResponse;
-        const json = await (res as any).json();
+        const res = await POST(req);
+        const json = (await res.json()) as SearchJson;
 
         expect(json.usedAi).toBe(false);
-        expect(json.carriers).toHaveLength(1);
-        expect(json.carriers[0].name).toBe("Alpine Logistics");
+        if ("carriers" in json) {
+            expect(json.carriers).toHaveLength(1);
+            expect(json.carriers[0].name).toBe("Alpine Logistics");
+        } else {
+            throw new Error("Expected DB carriers");
+        }
     });
 
     it("returns stub suggestions when DB empty", async () => {
-        // DB empty via default mock
         const req = new Request("http://test.local/api/search", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ type: "truck", origin: "FR", destination: "DE" }),
         });
 
-        const res = (await POST(req as any)) as NextResponse;
-        const json = await (res as any).json();
+        const res = await POST(req);
+        const json = (await res.json()) as SearchJson;
 
         expect(json.usedAi).toBe(true);
-        expect(json.suggestions.length).toBeGreaterThan(0);
-        expect(json.suggestions[0].source).toBe("ai");
+        if ("suggestions" in json) {
+            expect(json.suggestions.length).toBeGreaterThan(0);
+            expect(json.suggestions[0].source).toBe("ai");
+        } else {
+            throw new Error("Expected AI suggestions");
+        }
     });
 });

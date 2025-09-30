@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-
+import Link from "next/link";
 
 export default function HowItWorks() {
     // --- Reusable bits -------------------------------------------------------
@@ -61,7 +61,8 @@ export default function HowItWorks() {
                         </div>
                     </div>
                     <nav className="hidden md:flex items-center gap-6 text-sm text-gray-700">
-                        <a className="hover:text-gray-900" href="/">Search</a>
+                        {/* FIX: use Link for internal route "/" */}
+                        <Link className="hover:text-gray-900" href="/">Search</Link>
                         <a className="hover:text-gray-900" href="#faq">FAQ</a>
                         <a className="hover:text-gray-900" href="#cta">For carriers</a>
                     </nav>
@@ -163,7 +164,7 @@ export default function HowItWorks() {
                     <h3 className="mt-2 text-lg font-semibold">What “Verified” means</h3>
                     <p className="mt-2 text-sm text-gray-700">
                         Verified carriers have been checked by LaneList using public records, and direct validation.
-                        They display a <Badge tone="brand">✔️ Verified</Badge> badge and show up when "verified only" is enabled.
+                        They display a <Badge tone="brand">✔️ Verified</Badge> badge and show up when &ldquo;verified only&rdquo; is enabled.
                     </p>
                 </Panel>
                 <Panel>
@@ -178,7 +179,7 @@ export default function HowItWorks() {
                     <div className="text-2xl">🔐</div>
                     <h3 className="mt-2 text-lg font-semibold">Privacy & control</h3>
                     <p className="mt-2 text-sm text-gray-700">
-                        LaneList is a search tool, not a broker. We don’t add fees and we don’t sit between you and providers. Contact
+                        LaneList is a search tool, not a broker. We don&rsquo;t add fees and we don&rsquo;t sit between you and providers. Contact
                         is direct; your negotiations remain private.
                     </p>
                 </Panel>
@@ -227,7 +228,8 @@ export default function HowItWorks() {
                         </div>
                         <div className="flex md:justify-end items-center gap-3">
                             <button className="px-4 py-2 rounded-xl bg-white text-gray-900 font-medium shadow">List your company</button>
-                            <a href="/" className="px-4 py-2 rounded-xl border border-white/60 text-white">Back to search</a>
+                            {/* FIX: use Link for internal route "/" */}
+                            <Link href="/" className="px-4 py-2 rounded-xl border border-white/60 text-white">Back to search</Link>
                         </div>
                     </div>
                 </div>
@@ -248,7 +250,8 @@ export default function HowItWorks() {
                             <div className="font-medium text-gray-900">Product</div>
                             <ul className="mt-2 space-y-1 text-gray-600">
                                 <li>
-                                    <a className="hover:text-gray-900" href="/">Search</a>
+                                    {/* FIX: use Link for internal route "/" */}
+                                    <Link className="hover:text-gray-900" href="/">Search</Link>
                                 </li>
                                 <li>
                                     <a className="hover:text-gray-900" href="#faq">FAQ</a>
@@ -279,4 +282,3 @@ export default function HowItWorks() {
         </div>
     );
 }
-
