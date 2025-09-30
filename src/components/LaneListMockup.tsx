@@ -209,7 +209,7 @@ export default function LaneListMockup() {
                         </div>
                     </div>
                     <nav className="hidden md:flex items-center gap-6 text-sm text-gray-700">
-                        <a className="hover:text-gray-900" href="#how">
+                        <a className="hover:text-gray-900" href="/how-it-works">
                             How it works
                         </a>
                         <a className="hover:text-gray-900" href="#carriers">
@@ -509,7 +509,7 @@ export default function LaneListMockup() {
                             <div className="font-medium text-gray-900">Product</div>
                             <ul className="mt-2 space-y-1 text-gray-600">
                                 <li>
-                                    <a className="hover:text-gray-900" href="#how">
+                                    <a className="hover:text-gray-900" href="#/how-it-works">
                                         How it works
                                     </a>
                                 </li>
