@@ -16,6 +16,7 @@
     "ajv": "^8.17.1",
     "mongoose": "^8.18.2",
     "next": "15.5.3",
+    "nodemailer": "^7.0.6",
     "openai": "^5.23.0",
     "react": "19.1.0",
     "react-dom": "19.1.0"
@@ -28,6 +29,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
+    "@types/nodemailer": "^7.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/testing-library__jest-dom": "^6.0.0",

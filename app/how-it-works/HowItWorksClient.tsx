@@ -227,16 +227,17 @@ export default function HowItWorks() {
                             </p>
                         </div>
                         <div className="flex md:justify-end items-center gap-3">
-                            <button className="px-4 py-2 rounded-xl bg-white text-gray-900 font-medium shadow">List your company</button>
-                            {/* FIX: use Link for internal route "/" */}
+                            <Link href="/contact">
+                                <button className="px-4 py-2 rounded-xl bg-white text-gray-900 font-medium shadow">List your company</button>
+                            </Link>
                             <Link href="/" className="px-4 py-2 rounded-xl border border-white/60 text-white">Back to search</Link>
                         </div>
                     </div>
                 </div>
-            </section>
+            </section >
 
             {/* Footer (light) ------------------------------------------------------*/}
-            <footer className="border-t border-gray-200">
+            < footer className="border-t border-gray-200" >
                 <div className="mx-auto max-w-7xl px-4 py-8 grid md:grid-cols-3 gap-6 text-sm">
                     <div>
                         <div className="flex items-center gap-2">
@@ -254,10 +255,10 @@ export default function HowItWorks() {
                                     <Link className="hover:text-gray-900" href="/">Search</Link>
                                 </li>
                                 <li>
-                                    <a className="hover:text-gray-900" href="#faq">FAQ</a>
+                                    <Link className="hover:text-gray-900" href="/how-it-works#faq">FAQ</Link>
                                 </li>
                                 <li>
-                                    <a className="hover:text-gray-900" href="#cta">Add your company</a>
+                                    <Link className="hover:text-gray-900" href="/contact">Add your company</Link>
                                 </li>
                             </ul>
                         </div>
@@ -265,10 +266,10 @@ export default function HowItWorks() {
                             <div className="font-medium text-gray-900">Company</div>
                             <ul className="mt-2 space-y-1 text-gray-600">
                                 <li>
-                                    <a className="hover:text-gray-900" href="#">About</a>
+                                    <Link className="hover:text-gray-900" href="/how-it-works">About</Link>
                                 </li>
                                 <li>
-                                    <a className="hover:text-gray-900" href="#">Contact</a>
+                                    <Link className="hover:text-gray-900" href="/contact">Contact</Link>
                                 </li>
                                 <li>
                                     <a className="hover:text-gray-900" href="#">Privacy</a>
@@ -278,7 +279,7 @@ export default function HowItWorks() {
                     </div>
                     <div className="text-gray-600 md:text-right">© {new Date().getFullYear()} LaneList</div>
                 </div>
-            </footer>
-        </div>
+            </footer >
+        </div >
     );
 }

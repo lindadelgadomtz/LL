@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import React, { useEffect, useRef, useState } from "react";
 
 /** Domain types */
@@ -212,10 +213,10 @@ export default function LaneListMockup() {
                         <a className="hover:text-gray-900" href="/how-it-works">
                             How it works
                         </a>
-                        <a className="hover:text-gray-900" href="#carriers">
+                        <a className="hover:text-gray-900" href="/contact">
                             Carriers
                         </a>
-                        <a className="hover:text-gray-900" href="#cta">
+                        <a className="hover:text-gray-900" href="/contact">
                             Add your company
                         </a>
                     </nav>
@@ -441,9 +442,9 @@ export default function LaneListMockup() {
                         <h3 className="text-lg font-semibold">No carriers match your filters</h3>
                         <p className="text-gray-600">Try adjusting your transport type or changing a country.</p>
                         <div className="mt-6 inline-flex items-center gap-3">
-                            <a href="#cta" className="px-4 py-2 rounded-xl bg-sky-600 text-white shadow">
+                            <Link href="/contact" className="px-4 py-2 rounded-xl bg-sky-600 text-white shadow">
                                 List your company
-                            </a>
+                            </Link>
                             <button onClick={resetFilters} className="px-4 py-2 rounded-xl border">
                                 Reset filters
                             </button>
@@ -481,12 +482,16 @@ export default function LaneListMockup() {
                             </p>
                         </div>
                         <div className="flex md:justify-end items-center gap-3">
-                            <button className="px-4 py-2 rounded-xl bg-white text-gray-900 font-medium shadow">
-                                List your company
-                            </button>
-                            <button className="px-4 py-2 rounded-xl border border-white/60 text-white">
-                                Learn more
-                            </button>
+                            <Link href="/contact">
+                                <button className="px-4 py-2 rounded-xl bg-white text-gray-900 font-medium shadow">
+                                    List your company
+                                </button>
+                            </Link>
+                            <Link href="/how-it-works">
+                                <button className="px-4 py-2 rounded-xl border border-white/60 text-white">
+                                    Learn more
+                                </button>
+                            </Link>
                         </div>
                     </div>
                 </div>
@@ -509,17 +514,17 @@ export default function LaneListMockup() {
                             <div className="font-medium text-gray-900">Product</div>
                             <ul className="mt-2 space-y-1 text-gray-600">
                                 <li>
-                                    <a className="hover:text-gray-900" href="#/how-it-works">
+                                    <a className="hover:text-gray-900" href="/how-it-works">
                                         How it works
                                     </a>
                                 </li>
                                 <li>
-                                    <a className="hover:text-gray-900" href="#carriers">
+                                    <a className="hover:text-gray-900" href="/contact">
                                         Carriers
                                     </a>
                                 </li>
                                 <li>
-                                    <a className="hover:text-gray-900" href="#cta">
+                                    <a className="hover:text-gray-900" href="/contact">
                                         Add your company
                                     </a>
                                 </li>
@@ -529,12 +534,12 @@ export default function LaneListMockup() {
                             <div className="font-medium text-gray-900">Company</div>
                             <ul className="mt-2 space-y-1 text-gray-600">
                                 <li>
-                                    <a className="hover:text-gray-900" href="#">
+                                    <a className="hover:text-gray-900" href="/how-it-works">
                                         About
                                     </a>
                                 </li>
                                 <li>
-                                    <a className="hover:text-gray-900" href="#">
+                                    <a className="hover:text-gray-900" href="/contact">
                                         Contact
                                     </a>
                                 </li>
