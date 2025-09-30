@@ -13,6 +13,7 @@
     "test:ci": "jest --ci --coverage"
   },
   "dependencies": {
+    "@vercel/analytics": "^1.5.0",
     "ajv": "^8.17.1",
     "mongoose": "^8.18.2",
     "next": "15.5.3",
