@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LaneList | Filter. Match. Contact.",
+  title: "LaneList | Filter. Match. Contact. ",
   description: "Filter. Match. Contact",
   robots: { index: true, follow: true }
 };
