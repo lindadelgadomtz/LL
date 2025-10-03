@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "LaneList | Filter. Match. Contact.",
   description: "Filter. Match. Contact",
-  robots: { index: false, follow: false }
+  robots: { index: true, follow: true }
 };
 
 export default function RootLayout({
